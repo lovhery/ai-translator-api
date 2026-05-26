@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Translator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .box {
+            background: white;
+            padding: 25px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #444;
+            font-weight: bold;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 14px;
+            min-height: 100px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #4a90d9;
+        }
+        
+        button {
+            background-color: #4a90d9;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 3px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #357abd;
+        }
+        
+        button:disabled {
+            background-color: #999;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 3px;
+            display: none;
+        }
+        
+        .result.show {
+            display: block;
+        }
+        
+        .result.ok {
+            background-color: #e8f5e9;
+            border: 1px solid #81c784;
+        }
+        
+        .result.error {
+            background-color: #ffebee;
+            border: 1px solid #e57373;
+        }
+        
+        .result-label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .result-text {
+            font-size: 16px;
+            color: #222;
+            line-height: 1.5;
+        }
+        
+        .model-info {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .history-item {
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            background: #fafafa;
+        }
+        
+        .history-input {
+            color: #555;
+            margin-bottom: 6px;
+        }
+        
+        .history-result {
+            color: #4a90d9;
+            font-weight: bold;
+        }
+        
+        .history-date {
+            font-size: 11px;
+            color: #999;
+            margin-top: 6px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 15px;
+            color: #666;
+        }
+        
+        .counter {
+            color: #666;
+            font-size: 14px;
+            margin-left: 8px;
+        }
+        
+        small {
+            color: #888;
+            display: block;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌐 AI Translator</h1>
+    <div class="subtitle">Перевод текста EN → RU</div>
+    
+    <div class="box">
+        <label for="inputText">Текст для перевода:</label>
+        <textarea 
+            id="inputText" 
+            placeholder="Введите текст на английском..."
+            maxlength="500"
+        ></textarea>
+        <small>Максимум 500 символов</small>
+        
+        <button id="translateBtn" onclick="translateText()">
+            Перевести
+        </button>
+        
+        <div id="result" class="result">
+            <div class="result-label">Результат:</div>
+            <div id="resultText" class="result-text"></div>
+            <div id="modelInfo" class="model-info"></div>
+        </div>
+    </div>
+    
+    <div class="box">
+        <h2>История запросов <span class="counter" id="historyCount"></span></h2>
+        <div id="historyList">
+            <div class="loading">Загрузка...</div>
+        </div>
+    </div>
+    
+    <script>
+        async function translateText() {
+            const inputText = document.getElementById('inputText').value.trim();
+            const resultDiv = document.getElementById('result');
+            const resultText = document.getElementById('resultText');
+            const modelInfo = document.getElementById('modelInfo');
+            const btn = document.getElementById('translateBtn');
+            
+            if (!inputText) {
+                resultDiv.className = 'result show error';
+                resultText.textContent = 'Введите текст для перевода';
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Переводим...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: inputText })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result show ok';
+                    resultText.textContent = data.result;
+                    modelInfo.textContent = `Модель: ${data.model_name}`;
+                    loadHistory();
+                } else {
+                    resultDiv.className = 'result show error';
+                    resultText.textContent = 'Ошибка: ' + data.detail;
+                }
+            } catch (error) {
+                resultDiv.className = 'result show error';
+                resultText.textContent = 'Ошибка соединения: ' + error.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Перевести';
+            }
+        }
+        
+        async function loadHistory() {
+            const historyList = document.getElementById('historyList');
+            const historyCount = document.getElementById('historyCount');
+            
+            try {
+                const response = await fetch('/history');
+                const data = await response.json();
+                
+                historyCount.textContent = '(' + data.length + ')';
+                
+                if (data.length === 0) {
+                    historyList.innerHTML = '<div style="color: #999; text-align: center;">История пуста</div>';
+                    return;
+                }
+                
+                historyList.innerHTML = data.map(item => `
+                    <div class="history-item">
+                        <div class="history-input">${escapeHtml(item.input_text)}</div>
+                        <div class="history-result">→ ${escapeHtml(item.result_text)}</div>
+                        <div class="history-date">${new Date(item.created_at).toLocaleString('ru-RU')}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                historyList.innerHTML = '<div style="color: #e57373;">Ошибка загрузки</div>';
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadHistory);
+        
+        document.getElementById('inputText').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                translateText();
+            }
+        });
+    </script>
+</body>
+</html>
